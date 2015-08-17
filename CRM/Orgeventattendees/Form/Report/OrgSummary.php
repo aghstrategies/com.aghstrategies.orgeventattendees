@@ -170,9 +170,19 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
             'operatorType' => CRM_Report_Form::OP_MULTISELECT,
             'options' => CRM_Core_OptionGroup::values('event_type'),
           ),
-          'event_start_date' => array(
-            'title' => ts('Event Start Date'),
+          'event_start_date1' => array(
+            'title' => ts('Event Start Date (Period 1)'),
+            'type' => CRM_Utils_Type::T_DATE,
             'operatorType' => CRM_Report_Form::OP_DATE,
+            'name' => 'event_start_date',
+            'default' => 'this.year',
+          ),
+          'event_start_date2' => array(
+            'title' => ts('Event Start Date (Period 2)'),
+            'type' => CRM_Utils_Type::T_DATE,
+            'operatorType' => CRM_Report_Form::OP_DATE,
+            'name' => 'event_start_date',
+            'default' => 'previous.year',
           ),
         ),
         'order_bys' => array(
@@ -184,6 +194,98 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
     );
 
     parent::__construct();
+  }
+
+  /**
+   * Enforce valid date ranges.
+   *
+   * Borrowed from CRM_Report_Form_Contribute_Repeat::formRule().
+   *
+   * @param array $fields
+   *   Fields from the form.
+   * @param array $files
+   *   Not used.
+   * @param object $self
+   *   Not used.
+   *
+   * @return array
+   *   Array of errors.
+   */
+  public static function formRule($fields, $files, $self) {
+
+    $errors = $checkDate = $errorCount = array();
+
+    if ($fields['event_start_date1_relative'] == '0') {
+      $checkDate['event_start_date1']['event_start_date1_from'] = $fields['event_start_date1_from'];
+      $checkDate['event_start_date1']['event_start_date1_to'] = $fields['event_start_date1_to'];
+    }
+
+    if ($fields['event_start_date2_relative'] == '0') {
+      $checkDate['event_start_date2']['event_start_date2_from'] = $fields['event_start_date2_from'];
+      $checkDate['event_start_date2']['event_start_date2_to'] = $fields['event_start_date2_to'];
+    }
+
+    foreach ($checkDate as $date_range => $range_data) {
+      foreach ($range_data as $key => $value) {
+        if (CRM_Utils_Date::isDate($value)) {
+          $errorCount[$date_range][$key]['valid'] = 'true';
+          $errorCount[$date_range][$key]['is_empty'] = 'false';
+        }
+        else {
+          $errorCount[$date_range][$key]['valid'] = 'false';
+          $errorCount[$date_range][$key]['is_empty'] = 'true';
+          if (is_array($value)) {
+            foreach ($value as $v) {
+              if ($v) {
+                $errorCount[$date_range][$key]['is_empty'] = 'false';
+              }
+            }
+          }
+          elseif (!isset($value)) {
+            $errorCount[$date_range][$key]['is_empty'] = 'false';
+          }
+        }
+      }
+    }
+
+    $errorText = ts("Select valid date range");
+    foreach ($errorCount as $date_range => $error_data) {
+
+      if (($error_data[$date_range . '_from']['valid'] == 'false') &&
+        ($error_data[$date_range . '_to']['valid'] == 'false')
+      ) {
+
+        if (($error_data[$date_range . '_from']['is_empty'] == 'true') &&
+          ($error_data[$date_range . '_to']['is_empty'] == 'true')
+        ) {
+          $errors[$date_range . '_relative'] = $errorText;
+        }
+
+        if ($error_data[$date_range . '_from']['is_empty'] == 'false') {
+          $errors[$date_range . '_from'] = $errorText;
+        }
+
+        if ($error_data[$date_range . '_to']['is_empty'] == 'false') {
+          $errors[$date_range . '_to'] = $errorText;
+        }
+      }
+      elseif (($error_data[$date_range . '_from']['valid'] == 'true') &&
+        ($error_data[$date_range . '_to']['valid'] == 'false')
+      ) {
+        if ($error_data[$date_range . '_to']['is_empty'] == 'false') {
+          $errors[$date_range . '_to'] = $errorText;
+        }
+      }
+      elseif (($error_data[$date_range . '_from']['valid'] == 'false') &&
+        ($error_data[$date_range . '_to']['valid'] == 'true')
+      ) {
+        if ($error_data[$date_range . '_from']['is_empty'] == 'false') {
+          $errors[$date_range . '_from'] = $errorText;
+        }
+      }
+    }
+
+    return $errors;
   }
 
   public function select() {
