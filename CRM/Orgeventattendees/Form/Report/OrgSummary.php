@@ -21,8 +21,6 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
         'fields' => array(
           'sort_name_linked' => array(
             'title' => ts('Participant Name'),
-            'required' => TRUE,
-            'no_repeat' => TRUE,
             'dbAlias' => 'contact_civireport.sort_name',
           ),
           'first_name' => array(
@@ -38,25 +36,19 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
             'no_display' => TRUE,
             'required' => TRUE,
           ),
-          'employer_id' => array(
-            'title' => ts('Organization'),
-            'default' => TRUE,
-          ),
         ),
         'grouping' => 'contact-fields',
         'order_bys' => array(
           'sort_name' => array(
             'title' => ts('Sort Name'),
-            'default' => '1',
-            'default_weight' => '0',
-            'default_order' => 'ASC',
           ),
         ),
         'group_bys' => array(
           'employer_id' => array(
             'title' => ts('Organization'),
+            'default' => TRUE,
           ),
-        )
+        ),
         'filters' => array(
           'sort_name' => array(
             'title' => ts('Participant Name'),
@@ -82,6 +74,25 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
           ),
         ),
       ),
+      'organization' => array(
+        'name' => 'civicrm_contact',
+        'dao' => 'CRM_Contact_DAO_Contact',
+        'fields' => array(
+          'display_name' => array(
+            'title' => ts('Organization Name'),
+            'default' => TRUE,
+          ),
+        ),
+        'order_bys' => array(
+          'org_sort_name' => array(
+            'name' => 'sort_name',
+            'title' => ts('Organization Name'),
+            'default' => '1',
+            'default_weight' => '0',
+            'default_order' => 'ASC',
+          ),
+        ),
+      ),
       'civicrm_participant' => array(
         'dao' => 'CRM_Event_DAO_Participant',
         'fields' => array(
@@ -93,15 +104,26 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
           ),
           'event_id' => array(
             'default' => TRUE,
-            'type' => CRM_Utils_Type::T_STRING,
+            'title' => ts('Events Attended'),
+            // 'type' => CRM_Utils_Type::T_STRING,
+            'statistics' => array(
+              'count_distinct' => ts('Events Attended'),
+            ),
+          ),
+          'unique_staff' => array(
+            'name' => 'contact_id',
+            'default' => TRUE,
+            'title' => ts('Unique Staff'),
+            // 'type' => CRM_Utils_Type::T_STRING,
+            'statistics' => array(
+              'count_distinct' => ts('Unique Staff'),
+            ),
           ),
           'status_id' => array(
             'title' => ts('Status'),
-            'default' => TRUE,
           ),
           'role_id' => array(
             'title' => ts('Role'),
-            'default' => TRUE,
           ),
         ),
         'grouping' => 'event-fields',
@@ -133,13 +155,6 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
             'operatorType' => CRM_Report_Form::OP_DATE,
           ),
         ),
-        'order_bys' => array(
-          'event_id' => array(
-            'title' => ts('Event'),
-            'default_weight' => '1',
-            'default_order' => 'ASC',
-          ),
-        ),
       ),
       'civicrm_event' => array(
         'dao' => 'CRM_Event_DAO_Event',
@@ -163,8 +178,6 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
         'order_bys' => array(
           'event_type_id' => array(
             'title' => ts('Event Type'),
-            'default_weight' => '2',
-            'default_order' => 'ASC',
           ),
         ),
       ),
@@ -185,6 +198,8 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
                         {$this->_aliases['civicrm_event']}.is_template = 0
              LEFT JOIN civicrm_contact {$this->_aliases['civicrm_contact']}
                     ON ({$this->_aliases['civicrm_participant']}.contact_id  = {$this->_aliases['civicrm_contact']}.id  )
+             LEFT JOIN civicrm_contact {$this->_aliases['organization']}
+                    ON {$this->_aliases['civicrm_contact']}.employer_id = {$this->_aliases['organization']}.id
              {$this->_aclFrom}
       ";
   }
