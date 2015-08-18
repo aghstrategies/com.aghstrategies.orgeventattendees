@@ -48,34 +48,19 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
             'title' => ts('Sort Name'),
           ),
         ),
-        'group_bys' => array(
-          'employer_id' => array(
-            'title' => ts('Organization'),
-            'default' => TRUE,
-          ),
-        ),
         'filters' => array(
           'sort_name' => array(
             'title' => ts('Participant Name'),
             'operator' => 'like',
           ),
           'employer_id' => array(
-            'title' => ts('Organization'),
-          ),
-          'gender_id' => array(
-            'title' => ts('Gender'),
-            'operatorType' => CRM_Report_Form::OP_MULTISELECT,
-            'options' => CRM_Core_PseudoConstant::get('CRM_Contact_DAO_Contact', 'gender_id'),
-          ),
-          'birth_date' => array(
-            'title' => ts('Birth Date'),
-            'operatorType' => CRM_Report_Form::OP_DATE,
+            'title' => ts('Employer Name'),
           ),
           'contact_type' => array(
-            'title' => ts('Contact Type'),
+            'title' => ts('Contact Type (Participant)'),
           ),
           'contact_sub_type' => array(
-            'title' => ts('Contact Subtype'),
+            'title' => ts('Contact Subtype (Participant)'),
           ),
         ),
       ),
@@ -95,6 +80,27 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
             'default' => '1',
             'default_weight' => '0',
             'default_order' => 'ASC',
+          ),
+        ),
+      ),
+      'civicrm_event' => array(
+        'dao' => 'CRM_Event_DAO_Event',
+        'grouping' => 'event-fields',
+        'filters' => array(
+          'eid' => array(
+            'name' => 'event_type_id',
+            'title' => ts('Event Type (Recent Period)'),
+            'operatorType' => CRM_Report_Form::OP_MULTISELECT,
+            'options' => CRM_Core_OptionGroup::values('event_type'),
+            'joinclause' => TRUE,
+          ),
+          'event_start_date1' => array(
+            'title' => ts('Event Start Date (Recent Period)'),
+            'type' => CRM_Utils_Type::T_DATE,
+            'operatorType' => CRM_Report_Form::OP_DATE,
+            'name' => 'event_start_date',
+            'default' => 'this.year',
+            'joinclause' => TRUE,
           ),
         ),
       ),
@@ -155,6 +161,28 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
           'participant_register_date' => array(
             'title' => ts('Registration Date (Recent Period)'),
             'operatorType' => CRM_Report_Form::OP_DATE,
+            'joinclause' => TRUE,
+          ),
+        ),
+      ),
+      'civicrm_event2' => array(
+        'name' => 'civicrm_event',
+        'dao' => 'CRM_Event_DAO_Event',
+        'grouping' => 'event-fields',
+        'filters' => array(
+          'eid2' => array(
+            'name' => 'event_type_id',
+            'title' => ts('Event Type (Prior Period)'),
+            'operatorType' => CRM_Report_Form::OP_MULTISELECT,
+            'options' => CRM_Core_OptionGroup::values('event_type'),
+            'joinclause' => TRUE,
+          ),
+          'event_start_date2' => array(
+            'title' => ts('Event Start Date (Prior Period)'),
+            'type' => CRM_Utils_Type::T_DATE,
+            'operatorType' => CRM_Report_Form::OP_DATE,
+            'name' => 'event_start_date',
+            'default' => 'previous.year',
             'joinclause' => TRUE,
           ),
         ),
@@ -223,49 +251,6 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
           ),
         ),
       ),
-      'civicrm_event' => array(
-        'dao' => 'CRM_Event_DAO_Event',
-        'grouping' => 'event-fields',
-        'filters' => array(
-          'eid' => array(
-            'name' => 'event_type_id',
-            'title' => ts('Event Type (Recent Period)'),
-            'operatorType' => CRM_Report_Form::OP_MULTISELECT,
-            'options' => CRM_Core_OptionGroup::values('event_type'),
-            'joinclause' => TRUE,
-          ),
-          'event_start_date1' => array(
-            'title' => ts('Event Start Date (Recent Period)'),
-            'type' => CRM_Utils_Type::T_DATE,
-            'operatorType' => CRM_Report_Form::OP_DATE,
-            'name' => 'event_start_date',
-            'default' => 'this.year',
-            'joinclause' => TRUE,
-          ),
-        ),
-      ),
-      'civicrm_event2' => array(
-        'name' => 'civicrm_event',
-        'dao' => 'CRM_Event_DAO_Event',
-        'grouping' => 'event-fields',
-        'filters' => array(
-          'eid2' => array(
-            'name' => 'event_type_id',
-            'title' => ts('Event Type (Prior Period)'),
-            'operatorType' => CRM_Report_Form::OP_MULTISELECT,
-            'options' => CRM_Core_OptionGroup::values('event_type'),
-            'joinclause' => TRUE,
-          ),
-          'event_start_date2' => array(
-            'title' => ts('Event Start Date (Prior Period)'),
-            'type' => CRM_Utils_Type::T_DATE,
-            'operatorType' => CRM_Report_Form::OP_DATE,
-            'name' => 'event_start_date',
-            'default' => 'previous.year',
-            'joinclause' => TRUE,
-          ),
-        ),
-      ),
     );
 
     $this->_groupFilter = TRUE;
@@ -273,7 +258,9 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
 
     parent::__construct();
 
-    $this->_columns['civicrm_group']['filters']['gid']['title'] = ts('Organization\'s Group');
+    $this->_columns['civicrm_group']['filters']['gid']['title'] = ts('Group (Employer)');
+    $this->_columns['civicrm_tag']['filters']['tagid']['title'] = ts('Tag (Employer)');
+
   }
 
   /**
@@ -404,15 +391,15 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
       // $this->_select .= ", (100*((COUNT(DISTINCT {$this->_aliases['civicrm_participant']}.event_id) - COUNT(DISTINCT {$this->_aliases['civicrm_participant2']}.event_id)) / COUNT(DISTINCT {$this->_aliases['civicrm_participant2']}.event_id))) as event_id_pctchange";
       $this->_columnHeaders['event_id_pctchange']['title'] = ts('Events Attended Percent Change');
       $this->_columnHeaders['event_id_pctchange']['type'] = CRM_Utils_Type::T_FLOAT;
-      $this->_statFields[ts('Events Attended Percent Change')] = 'event_id_pctchange';
-      $this->_selectAliases[] = 'event_id_pctchange';
+      // $this->_statFields[ts('Events Attended Percent Change')] = 'event_id_pctchange';
+      // $this->_selectAliases[] = 'event_id_pctchange';
     }
     if (!empty($this->_params['fields']['unique_staff']) && !empty($this->_params['fields']['unique_staff2'])) {
       // $this->_select .= ", (100*((COUNT(DISTINCT {$this->_aliases['civicrm_participant']}.contact_id) - COUNT(DISTINCT {$this->_aliases['civicrm_participant2']}.contact_id)) / COUNT(DISTINCT {$this->_aliases['civicrm_participant2']}.contact_id))) as unique_staff_pctchange";
       $this->_columnHeaders['unique_staff_pctchange']['title'] = ts('Unique Staff Percent Change');
       $this->_columnHeaders['unique_staff_pctchange']['type'] = CRM_Utils_Type::T_FLOAT;
-      $this->_statFields[ts('Unique Staff Percent Change')] = 'unique_staff_pctchange';
-      $this->_selectAliases[] = 'unique_staff_pctchange';
+      // $this->_statFields[ts('Unique Staff Percent Change')] = 'unique_staff_pctchange';
+      // $this->_selectAliases[] = 'unique_staff_pctchange';
     }
   }
 
@@ -498,6 +485,30 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
                           {$smartGroupQuery} ) ";
   }
 
+  /**
+   * Altered to apply group to organization
+   *
+   * @param $field
+   * @param $value
+   * @param $op
+   *
+   * @return string
+   */
+  public function whereTagClause($field, $value, $op) {
+    // not using left join in query because if any contact
+    // belongs to more than one tag, results duplicate
+    // entries.
+    $sqlOp = $this->getSQLOperator($op);
+    if (!is_array($value)) {
+      $value = array($value);
+    }
+    $clause = "{$field['dbAlias']} IN (" . implode(', ', $value) . ")";
+    return " {$this->_aliases['organization']}.id {$sqlOp} (
+                          SELECT DISTINCT {$this->_aliases['civicrm_tag']}.entity_id
+                          FROM civicrm_entity_tag {$this->_aliases['civicrm_tag']}
+                          WHERE entity_table = 'civicrm_contact' AND {$clause} ) ";
+  }
+
   public function where() {
     if (!count($this->_params['gid_value'])) {
       $this->_whereClauses[] = "({$this->_aliases['civicrm_event']}.id IS NOT NULL OR {$this->_aliases['civicrm_event2']}.id is not null)";
@@ -569,10 +580,7 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
   }
 
   public function groupBy() {
-    parent::groupBy();
-    if (empty($this->_groupBy)) {
-      $this->_groupBy = "GROUP BY {$this->_aliases['civicrm_participant']}.id";
-    }
+    $this->_groupBy = "GROUP BY {$this->_aliases['organization']}.id";
   }
 
   /**
