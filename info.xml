@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <extension key="com.aghstrategies.orgeventattendees" type="module">
   <file>orgeventattendees</file>
-  <name>FIXME</name>
-  <description>FIXME</description>
+  <name>Event Attendees by Organization</name>
+  <description>Two reports to display event attendees by organization</description>
   <license>AGPL-3.0</license>
   <maintainer>
     <author>AGH Strategies</author>
@@ -18,9 +18,8 @@
   <version>1.0</version>
   <develStage>alpha</develStage>
   <compatibility>
-    <ver>4.2</ver>
+    <ver>4.6</ver>
   </compatibility>
-  <comments>This is a new, undeveloped module</comments>
   <civix>
     <namespace>CRM/Orgeventattendees</namespace>
   </civix>
