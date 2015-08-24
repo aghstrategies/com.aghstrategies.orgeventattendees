@@ -17,6 +17,15 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
   public $_joinClauses = array();
 
   /**
+   * Custom fields available in this report.
+   */
+  protected $_customGroupExtends = array('Contact');
+
+  protected $_customGroupGroupBy = TRUE;
+
+  protected $_autoIncludeIndexedFieldsAsOrderBys = 1;
+
+  /**
    * Set up the fields.
    */
   public function __construct() {
@@ -80,6 +89,12 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
             'default' => '1',
             'default_weight' => '0',
             'default_order' => 'ASC',
+          ),
+        ),
+        'group_bys' => array(
+          'org_id' => array(
+            'name' => 'id',
+            'title' => ts('Organization'),
           ),
         ),
       ),
@@ -359,6 +374,7 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
    * Move where() to before from().
    *
    * @param bool $applyLimit
+   *   Limit the rows to the page limit.
    *
    * @return string
    */
@@ -370,7 +386,7 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
     $this->groupBy();
     $this->orderBy();
 
-    // order_by columns not selected for display need to be included in SELECT
+    // The order_by columns not selected for display need to be included in SELECT.
     $unselectedSectionColumns = $this->unselectedSectionColumns();
     foreach ($unselectedSectionColumns as $alias => $section) {
       $this->_select .= ", {$section['dbAlias']} as {$alias}";
@@ -385,6 +401,9 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
     return $sql;
   }
 
+  /**
+   * Build the select for the query.
+   */
   public function select() {
     parent::select();
     if (!empty($this->_params['fields']['event_id']) && !empty($this->_params['fields']['event_id2'])) {
@@ -403,14 +422,17 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
     }
   }
 
+  /**
+   * Build the FROM for the query.
+   */
   public function from() {
     $joinOn = array();
     foreach ($this->_joinClauses as $tableName => $clauses) {
       $joinOn[$tableName] = 'AND ' . implode(' AND ', $clauses);
     }
     $this->_from = "
-        FROM civicrm_contact {$this->_aliases['organization']}
-          LEFT JOIN civicrm_contact {$this->_aliases['civicrm_contact']}
+        FROM civicrm_contact {$this->_aliases['civicrm_contact']}
+          LEFT JOIN civicrm_contact {$this->_aliases['organization']}
             ON {$this->_aliases['civicrm_contact']}.employer_id = {$this->_aliases['organization']}.id
           LEFT JOIN (
             civicrm_participant {$this->_aliases['civicrm_participant']}
@@ -437,13 +459,7 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
   }
 
   /**
-   * Altered to apply group to organization
-   *
-   * @param $field
-   * @param $value
-   * @param $op
-   *
-   * @return string
+   * Altered to apply group to organization.
    */
   public function whereGroupClause($field, $value, $op) {
 
@@ -486,7 +502,7 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
   }
 
   /**
-   * Altered to apply group to organization
+   * Altered to apply group to organization.
    *
    * @param $field
    * @param $value
@@ -509,6 +525,9 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
                           WHERE entity_table = 'civicrm_contact' AND {$clause} ) ";
   }
 
+  /**
+   * The WHERE of the report query.
+   */
   public function where() {
     if (!count($this->_params['gid_value'])) {
       $this->_whereClauses[] = "({$this->_aliases['civicrm_event']}.id IS NOT NULL OR {$this->_aliases['civicrm_event2']}.id is not null)";
@@ -579,8 +598,12 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
 
   }
 
+  /**
+   * GROUP BY for the query.
+   */
   public function groupBy() {
-    $this->_groupBy = "GROUP BY {$this->_aliases['organization']}.id";
+    parent::groupBy();
+    // $this->_groupBy = "GROUP BY {$this->_aliases['organization']}.id";
   }
 
   /**
@@ -609,6 +632,38 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
 
     // do print / pdf / instance stuff if needed
     $this->endPostProcess($rows);
+  }
+
+  /**
+   * Rearrange columns to put groupings first.
+   */
+  public function modifyColumnHeaders() {
+
+    // Get a list of the column headers for the groupBys.
+    $groupBys = $this->_params['group_bys'];
+    foreach ($groupBys as $key => $value) {
+      if ($value) {
+        foreach ($this->_columns as $tableName => $table) {
+          if (array_key_exists('group_bys', $table)) {
+            foreach ($table['group_bys'] as $fieldName => $field) {
+              if (!empty($this->_params['group_bys'][$fieldName]) && $fieldName == $key) {
+                $groupBys[$key] = ($key == 'org_id') ? 'organization_display_name' : "{$tableName}_{$key}";
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Work through the groupBys in reverse order.
+    array_reverse($groupBys);
+    foreach ($groupBys as $key => $value) {
+      if (!empty($this->_columnHeaders[$value])) {
+        $x = $this->_columnHeaders[$value];
+        unset($this->_columnHeaders[$value]);
+        $this->_columnHeaders = array_merge(array($value => $x), $this->_columnHeaders);
+      }
+    }
   }
 
   /**
