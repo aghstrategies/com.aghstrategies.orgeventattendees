@@ -55,53 +55,21 @@
             {/foreach}
         {/capture}
 
-        {if !$sections} {* section headers and sticky headers aren't playing nice yet *}
-            <thead class="sticky">
-            <tr>
-                {$tableHeader}
-        </tr>
-        </thead>
-        {/if}
-
-        {* pre-compile section header here, rather than doing it every time under foreach *}
-        {* {capture assign=sectionHeaderTemplate}
-            {assign var=columnCount value=$columnHeaders|@count}
-            {assign var=l value=$smarty.ldelim}
-            {assign var=r value=$smarty.rdelim}
-            {foreach from=$sections item=section key=column name=sections}
-                {counter assign="h"}
-                {$l}isValueChange value=$row.{$column} key="{$column}" assign=isValueChanged{$r}
-                {$l}if $isValueChanged{$r}
-
-                    {$l}if $sections.{$column}.type & 4{$r}
-                        {$l}assign var=printValue value=$row.{$column}|crmDate{$r}
-                    {$l}elseif $sections.{$column}.type eq 1024{$r}
-                        {$l}assign var=printValue value=$row.{$column}|crmMoney{$r}
-                    {$l}else{$r}
-                        {$l}assign var=printValue value=$row.{$column}{$r}
-                    {$l}/if{$r}
-
-                    <tr class="crm-report-sectionHeader crm-report-sectionHeader-{$h}{if $section.pageBreak} page-break{/if}"><th colspan="{$columnCount}">
-                        <h{$h}>{$section.title}: {$l}$printValue|default:"<em>none</em>"{$r}
-                            ({$l}sectionTotal key=$row.{$column} depth={$smarty.foreach.sections.index}{$r})
-                        </h{$h}>
-                    </th></tr>
-                    {if $smarty.foreach.sections.last}
-                        <tr class="crm-report-sectionCols">{$l}$tableHeader{$r}</tr>
-                    {/if}
-                {$l}/if{$r}
-            {/foreach}
-        {/capture} *}
-
-        {* {foreach from=$rows item=row key=rowid} *}
         {assign var=columnCount value=$columnHeaders|@count}
         {foreach from=$events item=monthevents key=yearmonth}
           <tr class="crm-report-sectionHeader crm-report-sectionHeader-1"><th colspan="{$columnCount}"><h1>{$yearmonth|crmDate}</h1></th></tr>
           {foreach from=$monthevents item=event}
-            <tr class="crm-report-sectionHeader crm-report-sectionHeader-2"><th colspan="{$columnCount}"><h2>{$event.title}</h2></th></tr>
+            <tr class="crm-report-sectionHeader crm-report-sectionHeader-2"><th colspan="{$columnCount}"><h2>{$event.title} ({$event.event_type} {$event.start_date|crmDate:'%m/%d/%Y'})</h2></th></tr>
             {assign var=event_id value=$event.id}
             {cycle values="odd-row,even-row" print=0 reset=1 advance=0}
-            {foreach from=$rows.$yearmonth.$event_id item=row key=rowid}
+            {if empty($nestedRows.$yearmonth.$event_id)}
+              <tr class="{cycle values="odd-row,even-row"} crm-report">
+                <td colspan="{$columnCount}">{ts}No participants{/ts}</td>
+              </tr>
+            {else}
+              <tr class="crm-report-sectionCols">{$tableHeader}</tr>
+            {/if}
+            {foreach from=$nestedRows.$yearmonth.$event_id item=row key=rowid}
            {* {eval var=$sectionHeaderTemplate} *}
               <tr class="{cycle values="odd-row,even-row"} {$row.class} crm-report" id="crm-report_{$yearmonth}_{$event_id}_{$rowid}">
                   {foreach from=$columnHeaders item=header key=field}

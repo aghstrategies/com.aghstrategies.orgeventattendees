@@ -7,10 +7,8 @@
 /**
  * Very similar to event participant listing report.
  *
- * Key differences are the following:
- * - header display for each organization,
- * - header display for each event, and
- * - option to have section headers for event start date by month.
+ * Key differences are header display for each organization, event start date by
+ * month, and event.
  */
 class CRM_Orgeventattendees_Form_Report_OrgDetail extends CRM_Report_Form_Event_ParticipantListing {
 
@@ -24,9 +22,28 @@ class CRM_Orgeventattendees_Form_Report_OrgDetail extends CRM_Report_Form_Event_
    */
   protected $_allEvents = array();
 
+  /**
+   * Rows nested by month and event.
+   */
+  protected $_nestedRows = array();
+
+  /**
+   * Build the class, adjusting the settings as compared to the main report.
+   */
   public function __construct() {
     parent::__construct();
     $this->_autoIncludeIndexedFieldsAsOrderBys = 0;
+
+    // Unset some defaults:
+    $this->_columns['civicrm_phone']['fields']['phone']['default'] = FALSE;
+    $this->_columns['civicrm_participant']['fields']['event_id']['default'] = FALSE;
+    $this->_columns['civicrm_participant']['fields']['status_id']['default'] = FALSE;
+
+    if ($campaignEnabled && !empty($this->activeCampaigns)) {
+      $this->_columns['civicrm_participant']['fields']['campaign_id']['default'] = FALSE;
+    }
+
+    $this->_columns['civicrm_event']['filters']['event_start_date']['default'] = 'this.year';
 
     $this->_columns['civicrm_event']['fields']['event_id_hidden'] = array(
       'name' => 'id',
@@ -45,6 +62,7 @@ class CRM_Orgeventattendees_Form_Report_OrgDetail extends CRM_Report_Form_Event_
         unset($this->_columns[$tableName]['order_bys']);
       }
     }
+    $this->_options = array();
   }
 
   /**
@@ -57,40 +75,20 @@ class CRM_Orgeventattendees_Form_Report_OrgDetail extends CRM_Report_Form_Event_
   }
 
   /**
-   * Build the array of rows, nested by month and event
-   * @param $sql
-   * @param $rows
+   * Build the array of rows, nested by month and event.
+   *
+   * @param string $sql
+   *   The SQL query.
+   * @param array $rows
+   *   The array of rows to build.
    */
   public function buildRows($sql, &$rows) {
     // First, get the big events array.
     $this->getAllEvents();
 
-    $dao = CRM_Core_DAO::executeQuery($sql);
-    if (!is_array($rows)) {
-      $rows = array();
-    }
-
-    // use this method to modify $this->_columnHeaders
-    $this->modifyColumnHeaders();
-
-    $unselectedSectionColumns = $this->unselectedSectionColumns();
-
-    while ($dao->fetch()) {
-      $row = array();
-      foreach ($this->_columnHeaders as $key => $value) {
-        if (property_exists($dao, $key)) {
-          $row[$key] = $dao->$key;
-        }
-      }
-
-      // section headers not selected for display need to be added to row
-      foreach ($unselectedSectionColumns as $key => $values) {
-        if (property_exists($dao, $key)) {
-          $row[$key] = $dao->$key;
-        }
-      }
-
-      $rows[$dao->civicrm_event_event_start_date_month][$dao->civicrm_event_event_id_hidden][] = $row;
+    parent::buildRows($sql, $rows);
+    foreach ($rows as $rowId => $row) {
+      $this->_nestedRows[$row['civicrm_event_event_start_date_month']][$row['civicrm_event_event_id_hidden']][] = $row;
     }
   }
 
@@ -99,39 +97,28 @@ class CRM_Orgeventattendees_Form_Report_OrgDetail extends CRM_Report_Form_Event_
    * @param bool $pager
    */
   public function formatDisplay(&$rows, $pager = TRUE) {
-    // set pager based on if any limit was applied in the query.
-    if ($pager) {
-      $this->setPager();
-    }
+    parent::formatDisplay($rows, $pager);
 
-    // unset columns not to be displayed.
-    foreach ($this->_columnHeaders as $key => $value) {
-      if (!empty($value['no_display'])) {
-        unset($this->_columnHeaders[$key]);
-      }
-    }
-
-    // unset columns not to be displayed.
-    if (!empty($rows)) {
-      foreach ($this->_noDisplay as $noDisplayField) {
-        foreach ($rows as $rowNum => $row) {
-          unset($this->_columnHeaders[$noDisplayField]);
-          break;
-        }
-      }
-    }
-
-    // use this method for formatting rows for display purpose.
-    foreach ($rows as $month => &$mRows) {
+    // Format the nested rows.
+    foreach ($this->_nestedRows as $month => &$mRows) {
       foreach ($mRows as $eventId => &$eRows) {
         $this->alterDisplay($eRows);
         CRM_Utils_Hook::alterReportVar('rows', $eRows, $this);
-
-        // use this method for formatting custom rows for display purpose.
-        $this->alterCustomDataDisplay($rows);
+        $this->alterCustomDataDisplay($eRows);
       }
     }
     $this->assign('events', $this->_allEvents);
+  }
+
+  /**
+   * Handles the assignment of the rows and nested rows.
+   *
+   * @param array &$rows
+   *   The report rows.
+   */
+  public function doTemplateAssignment(&$rows) {
+    parent::doTemplateAssignment($rows);
+    $this->assign_by_ref('nestedRows', $this->_nestedRows);
   }
 
   /**
@@ -186,42 +173,77 @@ class CRM_Orgeventattendees_Form_Report_OrgDetail extends CRM_Report_Form_Event_
     $eSQL .= " ORDER BY e.start_date ASC";
     $eDAO = CRM_Core_DAO::executeQuery($eSQL);
 
+    $eventType = CRM_Core_OptionGroup::values('event_type');
     while ($eDAO->fetch()) {
       $this->_allEvents[$eDAO->start_date_month][$eDAO->id] = array(
         'id' => $eDAO->id,
         'title' => $eDAO->title,
-        'event_type_id' => $eDAO->event_type_id,
+        'event_type' => CRM_Utils_Array::value($eDAO->event_type_id, $eventType, $eDAO->event_type_id),
         'start_date' => $eDAO->start_date,
       );
     }
   }
 
   /**
-   * override this method to build your own statistics
-   * @param $rows
+   * No statistics for now.
    *
-   * @return array
+   * @param array $rows
+   *   The array of rows in the report.
+   *
+   * @return array $statistics
+   *   Statistics to display.
    */
   public function statistics(&$rows) {
-    // $statistics = array();
-    //
-    // $count = count($rows);
-    //
-    // if ($this->_rollup && ($this->_rollup != '') && $this->_grandFlag) {
-    //   $count++;
-    // }
-    //
-    // $this->countStat($statistics, $count);
-    //
-    // $this->groupByStat($statistics);
-    //
-    // $this->filterStat($statistics);
-    //
-    // return $statistics;
+    $statistics = array();
+
+    $this->groupByStat($statistics);
+
+    $this->filterStat($statistics);
+
+    $this->totalPrograms($statistics);
+    $this->distinctPart($statistics, $rows);
+    return $statistics;
   }
 
+  /**
+   * Calculate number of programs.
+   *
+   * @param array &$statistics
+   *   Statistics to display on the report.
+   */
+  public function totalPrograms(&$statistics) {
+    $count = 0;
+    foreach ($this->_allEvents as $ym => $events) {
+      $count += count($events);
+    }
+    $statistics['filters']['allEventCount'] = array(
+      'title' => ts('Total programs during this time'),
+      'value' => $count,
+    );
+  }
+
+  public function distinctPart(&$statistics, $rows) {
+    $sql = "SELECT COUNT(DISTINCT {$this->_aliases['civicrm_participant']}.contact_id) as contacts, COUNT(DISTINCT {$this->_aliases['civicrm_participant']}.event_id) as events {$this->_from} {$this->_where} {$this->_having}";
+    $dao = CRM_Core_DAO::executeQuery($sql);
+    while ($dao->fetch()) {
+      $statistics['filters']['eventCount'] = array(
+        'title' => ts('Events attended'),
+        'value' => $dao->events,
+      );
+      $statistics['filters']['contactCount'] = array(
+        'title' => ts('Unique participants'),
+        'value' => $dao->contacts,
+      );
+    }
+  }
+
+  /**
+   * Bypass any limit on results.
+   *
+   * @param int $rowCount
+   *   The limit set elsewhere on rows.
+   */
   public function limit($rowCount = self::ROW_COUNT_LIMIT) {
-    // lets do the pager if in html mode
     $this->_limit = NULL;
   }
 
