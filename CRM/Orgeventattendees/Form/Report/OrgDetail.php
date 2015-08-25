@@ -41,8 +41,9 @@ class CRM_Orgeventattendees_Form_Report_OrgDetail extends CRM_Report_Form_Event_
     $this->_columns['civicrm_phone']['fields']['phone']['default'] = FALSE;
     $this->_columns['civicrm_participant']['fields']['event_id']['default'] = FALSE;
     $this->_columns['civicrm_participant']['fields']['status_id']['default'] = FALSE;
+    $this->_columns['civicrm_contribution']['fields']['contribution_status_id']['default'] = FALSE;
 
-    if ($campaignEnabled && !empty($this->activeCampaigns)) {
+    if (array_key_exists('campaign_id', $this->_columns['civicrm_participant']['fields'])) {
       $this->_columns['civicrm_participant']['fields']['campaign_id']['default'] = FALSE;
     }
 

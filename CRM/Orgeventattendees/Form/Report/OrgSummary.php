@@ -641,30 +641,31 @@ class CRM_Orgeventattendees_Form_Report_orgSummary extends CRM_Report_Form {
    * Rearrange columns to put groupings first.
    */
   public function modifyColumnHeaders() {
-
-    // Get a list of the column headers for the groupBys.
-    $groupBys = $this->_params['group_bys'];
-    foreach ($groupBys as $key => $value) {
-      if ($value) {
-        foreach ($this->_columns as $tableName => $table) {
-          if (array_key_exists('group_bys', $table)) {
-            foreach ($table['group_bys'] as $fieldName => $field) {
-              if (!empty($this->_params['group_bys'][$fieldName]) && $fieldName == $key) {
-                $groupBys[$key] = ($key == 'org_id') ? 'organization_display_name' : "{$tableName}_{$key}";
+    if (array_key_exists('group_bys', $this->_params)) {
+      // Get a list of the column headers for the groupBys.
+      $groupBys = $this->_params['group_bys'];
+      foreach ($groupBys as $key => $value) {
+        if ($value) {
+          foreach ($this->_columns as $tableName => $table) {
+            if (array_key_exists('group_bys', $table)) {
+              foreach ($table['group_bys'] as $fieldName => $field) {
+                if (!empty($this->_params['group_bys'][$fieldName]) && $fieldName == $key) {
+                  $groupBys[$key] = ($key == 'org_id') ? 'organization_display_name' : "{$tableName}_{$key}";
+                }
               }
             }
           }
         }
       }
-    }
 
-    // Work through the groupBys in reverse order.
-    array_reverse($groupBys);
-    foreach ($groupBys as $key => $value) {
-      if (!empty($this->_columnHeaders[$value])) {
-        $x = $this->_columnHeaders[$value];
-        unset($this->_columnHeaders[$value]);
-        $this->_columnHeaders = array_merge(array($value => $x), $this->_columnHeaders);
+      // Work through the groupBys in reverse order.
+      array_reverse($groupBys);
+      foreach ($groupBys as $key => $value) {
+        if (!empty($this->_columnHeaders[$value])) {
+          $x = $this->_columnHeaders[$value];
+          unset($this->_columnHeaders[$value]);
+          $this->_columnHeaders = array_merge(array($value => $x), $this->_columnHeaders);
+        }
       }
     }
   }
