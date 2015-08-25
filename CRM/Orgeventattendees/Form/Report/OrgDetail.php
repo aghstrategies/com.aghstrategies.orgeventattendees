@@ -19,88 +19,210 @@ class CRM_Orgeventattendees_Form_Report_OrgDetail extends CRM_Report_Form_Event_
    */
   protected $_customGroupExtends = array('Contact', 'Participant');
 
-  protected $_customGroupGroupBy = TRUE;
-
-  protected $_autoIncludeIndexedFieldsAsOrderBys = 1;
+  /**
+   * List of all events matching the criteria.
+   */
+  protected $_allEvents = array();
 
   public function __construct() {
     parent::__construct();
+    $this->_autoIncludeIndexedFieldsAsOrderBys = 0;
+
+    $this->_columns['civicrm_event']['fields']['event_id_hidden'] = array(
+      'name' => 'id',
+      'title' => ts('Event ID'),
+      'no_display' => TRUE,
+      'required' => TRUE,
+    );
     $this->_columns['civicrm_event']['fields']['event_start_date_month'] = array(
       'title' => ts('Event Start Month'),
       'dbAlias' => 'DATE_FORMAT(event_civireport.start_date, "%Y%m")',
       'no_display' => TRUE,
       'required' => TRUE,
     );
-    $this->_columns['civicrm_event']['order_bys']['event_start_date'] = array(
-      'title' => ts('Event Start Date'),
-    );
+    foreach ($this->_columns as $tableName => $table) {
+      if (array_key_exists('order_bys', $table)) {
+        unset($this->_columns[$tableName]['order_bys']);
+      }
+    }
   }
 
   /**
-   * Reworked to pull all events regardless of whether there were participants.
-   * @return {[type]} [description]
+   * Hard-coded ordering.
    */
-  public function from() {
-    $this->_from = "
-        FROM civicrm_participant {$this->_aliases['civicrm_participant']}
-             LEFT JOIN civicrm_event {$this->_aliases['civicrm_event']}
-                    ON ({$this->_aliases['civicrm_event']}.id = {$this->_aliases['civicrm_participant']}.event_id ) AND
-                        {$this->_aliases['civicrm_event']}.is_template = 0
-             LEFT JOIN civicrm_contact {$this->_aliases['civicrm_contact']}
-                    ON ({$this->_aliases['civicrm_participant']}.contact_id  = {$this->_aliases['civicrm_contact']}.id  )
-             {$this->_aclFrom}
-             LEFT JOIN civicrm_address {$this->_aliases['civicrm_address']}
-                    ON {$this->_aliases['civicrm_contact']}.id = {$this->_aliases['civicrm_address']}.contact_id AND
-                       {$this->_aliases['civicrm_address']}.is_primary = 1
-             LEFT JOIN  civicrm_email {$this->_aliases['civicrm_email']}
-                    ON ({$this->_aliases['civicrm_contact']}.id = {$this->_aliases['civicrm_email']}.contact_id AND
-                       {$this->_aliases['civicrm_email']}.is_primary = 1)
-             LEFT  JOIN civicrm_phone  {$this->_aliases['civicrm_phone']}
-                     ON {$this->_aliases['civicrm_contact']}.id = {$this->_aliases['civicrm_phone']}.contact_id AND
-                         {$this->_aliases['civicrm_phone']}.is_primary = 1
-      ";
-    if ($this->_contribField) {
-      $this->_from .= "
-             LEFT JOIN civicrm_participant_payment pp
-                    ON ({$this->_aliases['civicrm_participant']}.id  = pp.participant_id)
-             LEFT JOIN civicrm_contribution {$this->_aliases['civicrm_contribution']}
-                    ON (pp.contribution_id  = {$this->_aliases['civicrm_contribution']}.id)
-      ";
+  public function orderBy() {
+    $this->_orderBy = "ORDER BY {$this->_aliases['civicrm_event']}.start_date ASC, {$this->_aliases['civicrm_contact']}.sort_name ASC";
+    $this->_sections = array();
+    $this->assign('sections', $this->_sections);
+  }
+
+  /**
+   * Build the array of rows, nested by month and event
+   * @param $sql
+   * @param $rows
+   */
+  public function buildRows($sql, &$rows) {
+    // First, get the big events array.
+    $this->getAllEvents();
+
+    $dao = CRM_Core_DAO::executeQuery($sql);
+    if (!is_array($rows)) {
+      $rows = array();
     }
-    if ($this->_lineitemField) {
-      $this->_from .= "
-            LEFT JOIN civicrm_line_item line_item_civireport
-                  ON line_item_civireport.entity_table = 'civicrm_participant' AND
-                     line_item_civireport.entity_id = {$this->_aliases['civicrm_participant']}.id AND
-                     line_item_civireport.qty > 0
-      ";
-    }
-    if ($this->_balance) {
-      $this->_from .= "
-            LEFT JOIN civicrm_entity_financial_trxn eft
-                  ON (eft.entity_id = {$this->_aliases['civicrm_contribution']}.id)
-            LEFT JOIN civicrm_financial_account fa
-                  ON (fa.account_type_code = 'AR')
-            LEFT JOIN civicrm_financial_trxn ft
-                  ON (ft.id = eft.financial_trxn_id AND eft.entity_table = 'civicrm_contribution') AND
-                     (ft.to_financial_account_id != fa.id)
-      ";
+
+    // use this method to modify $this->_columnHeaders
+    $this->modifyColumnHeaders();
+
+    $unselectedSectionColumns = $this->unselectedSectionColumns();
+
+    while ($dao->fetch()) {
+      $row = array();
+      foreach ($this->_columnHeaders as $key => $value) {
+        if (property_exists($dao, $key)) {
+          $row[$key] = $dao->$key;
+        }
+      }
+
+      // section headers not selected for display need to be added to row
+      foreach ($unselectedSectionColumns as $key => $values) {
+        if (property_exists($dao, $key)) {
+          $row[$key] = $dao->$key;
+        }
+      }
+
+      $rows[$dao->civicrm_event_event_start_date_month][$dao->civicrm_event_event_id_hidden][] = $row;
     }
   }
 
-  public function orderBy() {
-    parent::orderBy();
-    if (!empty($this->_sections['civicrm_event_event_start_date'])) {
-      $newSections = array();
-      foreach ($this->_sections as $key => $value) {
-        if ($key == 'civicrm_event_event_start_date') {
-          $key = 'civicrm_event_event_start_date_month';
-        }
-        $newSections[$key] = $value;
-      }
-      $this->_sections = $newSections;
-      $this->assign('sections', $this->_sections);
+  /**
+   * @param $rows
+   * @param bool $pager
+   */
+  public function formatDisplay(&$rows, $pager = TRUE) {
+    // set pager based on if any limit was applied in the query.
+    if ($pager) {
+      $this->setPager();
     }
+
+    // unset columns not to be displayed.
+    foreach ($this->_columnHeaders as $key => $value) {
+      if (!empty($value['no_display'])) {
+        unset($this->_columnHeaders[$key]);
+      }
+    }
+
+    // unset columns not to be displayed.
+    if (!empty($rows)) {
+      foreach ($this->_noDisplay as $noDisplayField) {
+        foreach ($rows as $rowNum => $row) {
+          unset($this->_columnHeaders[$noDisplayField]);
+          break;
+        }
+      }
+    }
+
+    // use this method for formatting rows for display purpose.
+    foreach ($rows as $month => &$mRows) {
+      foreach ($mRows as $eventId => &$eRows) {
+        $this->alterDisplay($eRows);
+        CRM_Utils_Hook::alterReportVar('rows', $eRows, $this);
+
+        // use this method for formatting custom rows for display purpose.
+        $this->alterCustomDataDisplay($rows);
+      }
+    }
+    $this->assign('events', $this->_allEvents);
+  }
+
+  /**
+   * Set up array of all events within the range, regardless of participants.
+   */
+  public function getAllEvents() {
+    $eSQL = 'SELECT e.id, e.title, e.event_type_id, e.start_date, DATE_FORMAT(e.start_date, "%Y%m") as start_date_month FROM civicrm_event e WHERE e.is_template = 0';
+    $clauses = array();
+    if (array_key_exists('filters', $this->_columns['civicrm_event'])) {
+      foreach ($this->_columns['civicrm_event']['filters'] as $fieldName => $field) {
+        $clause = NULL;
+
+        if (CRM_Utils_Array::value('type', $field) & CRM_Utils_Type::T_DATE) {
+          $relative = CRM_Utils_Array::value("{$fieldName}_relative", $this->_params);
+          $from = CRM_Utils_Array::value("{$fieldName}_from", $this->_params);
+          $to = CRM_Utils_Array::value("{$fieldName}_to", $this->_params);
+
+          if ($relative || $from || $to) {
+            $clause = $this->dateClause($field['name'], $relative, $from, $to, $field['type']);
+          }
+        }
+        else {
+          $op = CRM_Utils_Array::value("{$fieldName}_op", $this->_params);
+
+          if ($fieldName == 'rid') {
+            $value = CRM_Utils_Array::value("{$fieldName}_value", $this->_params);
+            if (!empty($value)) {
+              $clause = "( {$field['dbAlias']} REGEXP '[[:<:]]" .
+                implode('[[:>:]]|[[:<:]]', $value) . "[[:>:]]' )";
+            }
+            $op = NULL;
+          }
+
+          if ($op) {
+            $clause = $this->whereClause($field,
+              $op,
+              CRM_Utils_Array::value("{$fieldName}_value", $this->_params),
+              CRM_Utils_Array::value("{$fieldName}_min", $this->_params),
+              CRM_Utils_Array::value("{$fieldName}_max", $this->_params)
+            );
+          }
+        }
+
+        if (!empty($clause)) {
+          $clauses[] = $clause;
+        }
+      }
+    }
+    if (!empty($clauses)) {
+      $eSQL .= ' AND ' . implode(' AND ', $clauses);
+    }
+    $eSQL .= " ORDER BY e.start_date ASC";
+    $eDAO = CRM_Core_DAO::executeQuery($eSQL);
+
+    while ($eDAO->fetch()) {
+      $this->_allEvents[$eDAO->start_date_month][$eDAO->id] = array(
+        'id' => $eDAO->id,
+        'title' => $eDAO->title,
+        'event_type_id' => $eDAO->event_type_id,
+        'start_date' => $eDAO->start_date,
+      );
+    }
+  }
+
+  /**
+   * override this method to build your own statistics
+   * @param $rows
+   *
+   * @return array
+   */
+  public function statistics(&$rows) {
+    // $statistics = array();
+    //
+    // $count = count($rows);
+    //
+    // if ($this->_rollup && ($this->_rollup != '') && $this->_grandFlag) {
+    //   $count++;
+    // }
+    //
+    // $this->countStat($statistics, $count);
+    //
+    // $this->groupByStat($statistics);
+    //
+    // $this->filterStat($statistics);
+    //
+    // return $statistics;
+  }
+
+  public function limit($rowCount = self::ROW_COUNT_LIMIT) {
+    // lets do the pager if in html mode
+    $this->_limit = NULL;
   }
 
 }
