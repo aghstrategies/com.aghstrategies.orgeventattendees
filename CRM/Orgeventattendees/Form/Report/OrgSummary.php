@@ -2,6 +2,9 @@
 /**
  * @file
  * Event Attendees by Organization Report.
+ *
+ * Copyright (C) 2015, AGH Strategies, LLC <info@aghstrategies.com>
+ * Licensed under the GNU Affero Public License 3.0 (see LICENSE.txt)
  */
 
 /**

@@ -1,4 +1,17 @@
 <?php
+/**
+ * @file
+ * Event Attendees by Organization
+ *
+ * A CiviCRM extension to add two reports:
+ * - A summary report to display numbers of events attended and staff attending
+ *   events from each organization
+ * - A detail report intended to display the events available to attend for an
+ *   organization, along with the contacts attending.
+ *
+ * Copyright (C) 2015, AGH Strategies, LLC <info@aghstrategies.com>
+ * Licensed under the GNU Affero Public License 3.0 (see LICENSE.txt)
+ */
 
 require_once 'orgeventattendees.civix.php';
 
